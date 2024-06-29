@@ -2,14 +2,13 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { validationResult } = require("express-validator");
 const Student = require("../models/Student");
-const Admin = require("../models/Admin");
-
+const Course = require("../models/Course");
 // Student signup
 exports.signup = async (req, res) => {
-  const { name, admissionNo, courseId, email, phone, password } = req.body;
+  const { name, admissionNo, courseName, email, phone, password } = req.body;
 
   try {
-    let student = await Student.findOne({ email });
+    let student = await Student.findOne({ admissionNo });
 
     if (student) {
       return res
@@ -17,10 +16,15 @@ exports.signup = async (req, res) => {
         .json({ errors: [{ msg: "Student already exists" }] });
     }
 
+    const course = await Course.findOne({ name: courseName });
+    if (!course) {
+      return res.status(400).json({ errors: [{ msg: "Invalid course name" }] });
+    }
+
     student = new Student({
       name,
       admissionNo,
-      courseId,
+      courseName: course.name,
       email,
       phone,
       password,
@@ -32,20 +36,16 @@ exports.signup = async (req, res) => {
     await student.save();
 
     const payload = {
-      student: {
+      user: {
         id: student.id,
+        role: "student", // Ensure the role is included in the payload
       },
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: "5 days" },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token });
-      }
-    );
+    jwt.sign(payload, "payment", { expiresIn: "5 days" }, (err, token) => {
+      if (err) throw err;
+      res.json({ token });
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
@@ -54,10 +54,10 @@ exports.signup = async (req, res) => {
 
 // Student login
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const { admissionNo, password } = req.body;
 
   try {
-    let student = await Student.findOne({ email });
+    let student = await Student.findOne({ admissionNo });
 
     if (!student) {
       return res.status(400).json({ errors: [{ msg: "Invalid Credentials" }] });
@@ -70,24 +70,18 @@ exports.login = async (req, res) => {
     }
 
     const payload = {
-      student: {
+      user: {
         id: student.id,
+        role: "student", // Ensure the role is included in the payload
       },
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: "5 days" },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token });
-      }
-    );
+    jwt.sign(payload, "payment", { expiresIn: "5 days" }, (err, token) => {
+      if (err) throw err;
+      res.json({ token });
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
   }
 };
-
-// Admin signup

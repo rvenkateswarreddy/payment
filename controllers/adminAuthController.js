@@ -1,12 +1,15 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { validationResult } = require("express-validator");
 const Admin = require("../models/Admin");
 
-// @route   POST api/auth/admin/signup
-// @desc    Register a new admin
-// @access  Public
+// Admin signup
 exports.adminSignup = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, phone, password, secretKey } = req.body;
+
+  if (secretKey !== "payment") {
+    return res.status(400).json({ errors: [{ msg: "Invalid Secret Key" }] });
+  }
 
   try {
     let admin = await Admin.findOne({ email });
@@ -20,7 +23,9 @@ exports.adminSignup = async (req, res) => {
     admin = new Admin({
       name,
       email,
+      phone,
       password,
+      secretKey,
     });
 
     const salt = await bcrypt.genSalt(10);
@@ -29,30 +34,22 @@ exports.adminSignup = async (req, res) => {
     await admin.save();
 
     const payload = {
-      user: {
+      admin: {
         id: admin.id,
-        role: "admin",
       },
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: 360000 },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token });
-      }
-    );
+    jwt.sign(payload, "payment", { expiresIn: "5 days" }, (err, token) => {
+      if (err) throw err;
+      res.json({ token });
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
   }
 };
 
-// @route   POST api/auth/admin/login
-// @desc    Authenticate admin & get token
-// @access  Public
+// Admin login
 exports.adminLogin = async (req, res) => {
   const { email, password } = req.body;
 
@@ -70,21 +67,15 @@ exports.adminLogin = async (req, res) => {
     }
 
     const payload = {
-      user: {
+      admin: {
         id: admin.id,
-        role: "admin",
       },
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: 360000 },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token });
-      }
-    );
+    jwt.sign(payload, "payment", { expiresIn: "5 days" }, (err, token) => {
+      if (err) throw err;
+      res.json({ token });
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");

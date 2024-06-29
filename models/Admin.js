@@ -10,7 +10,15 @@ const AdminSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  phone: {
+    type: String,
+    required: true,
+  },
   password: {
+    type: String,
+    required: true,
+  },
+  secretKey: {
     type: String,
     required: true,
   },

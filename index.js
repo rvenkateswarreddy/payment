@@ -1,16 +1,26 @@
 const express = require("express");
+const cors = require("cors");
 // const mongoose = require("mongoose");
 
 require("dotenv").config();
 
 const connectDB = require("./config/db");
-const app = express();
 
-// Connect to MongoDB
+const app = express();
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"],
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+// Connect to MongoDBa
 connectDB();
 
 // Init Middleware
-app.use(express.json({ extended: false }));
 
 // Define Routes
 app.use("/api/auth", require("./routes/auth"));

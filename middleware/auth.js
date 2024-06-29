@@ -11,7 +11,7 @@ exports.adminAuth = function (req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, "payment");
     if (decoded.user.role !== "admin") {
       return res.status(403).json({ msg: "Access denied, not an admin" });
     }
@@ -31,13 +31,17 @@ exports.studentAuth = function (req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Token:", token); // Log the token
+    const decoded = jwt.verify(token, "payment");
+    console.log("Decoded Payload:", decoded); // Log the decoded payload
+
     if (decoded.user.role !== "student") {
       return res.status(403).json({ msg: "Access denied, not a student" });
     }
     req.user = decoded.user;
     next();
   } catch (err) {
+    console.error("JWT Error:", err); // Log the error
     res.status(401).json({ msg: "Token is not valid" });
   }
 };
