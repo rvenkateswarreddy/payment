@@ -7,6 +7,9 @@ const {
   getPaymentDetails,
   getPaymentHistory,
   makePayment,
+  verifyPayment,
+  getPaymentReports,
+  getFees,
 } = require("../controllers/studentController");
 
 // Middleware for student authentication
@@ -15,8 +18,15 @@ const { studentAuth } = require("../middleware/auth");
 // @route   GET api/students/dashboard
 // @desc    Retrieve student dashboard data (profile, payment details, history)
 // @access  Private (Student)
-router.get("/dashboard", studentAuth, getStudentDashboard);
+// Route to get payment details by payment ID
+router.get("/details/:paymentId", studentAuth, getPaymentDetails);
 
+// Route to get payment history for a student
+router.get("/history/:studentId", getPaymentHistory);
+
+// Route to get payment reports
+router.get("/reports", studentAuth, getPaymentReports);
+router.get("/fees/:studentId", studentAuth, getFees);
 // @route   GET api/students/profile
 // @desc    Get student profile information
 // @access  Private (Student)
@@ -30,16 +40,11 @@ router.put("/profile", studentAuth, updateStudentProfile);
 // @route   GET api/students/payments
 // @desc    Get payment details (total amount, paid amount, pending amount)
 // @access  Private (Student)
-router.get("/payments", studentAuth, getPaymentDetails);
-
-// @route   GET api/students/payments/history
-// @desc    Get payment history
-// @access  Private (Student)
-router.get("/payments/history", studentAuth, getPaymentHistory);
 
 // @route   POST api/students/payments/make
 // @desc    Initiate payment via payment gateway (Stripe/Razorpay)
 // @access  Private (Student)
 router.post("/payments/make", studentAuth, makePayment);
+router.post("/payments/verify", studentAuth, verifyPayment);
 
 module.exports = router;

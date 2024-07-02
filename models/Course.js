@@ -28,15 +28,16 @@ const coursePrices = {
 
 // Initialize courses with fixed prices
 const initializeCourses = async () => {
-  for (const [name, fee] of Object.entries(coursePrices)) {
-    const course = await Course.findOne({ name });
-    if (!course) {
-      await Course.create({ name, fee });
+  try {
+    for (const [name, fee] of Object.entries(coursePrices)) {
+      const course = await Course.findOne({ name });
+      if (!course) {
+        await Course.create({ name, fee });
+      }
     }
+  } catch (err) {
+    console.error("Error initializing courses:", err);
   }
 };
-
-// Call the function to initialize courses (you can also call this function from another script)
-initializeCourses();
 
 module.exports = Course;

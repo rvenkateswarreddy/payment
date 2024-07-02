@@ -1,5 +1,3 @@
-// middleware/auth.js
-
 const jwt = require("jsonwebtoken");
 
 // Admin Authentication Middleware
@@ -12,10 +10,10 @@ exports.adminAuth = function (req, res, next) {
 
   try {
     const decoded = jwt.verify(token, "payment");
-    if (decoded.user.role !== "admin") {
+    if (!decoded.admin || decoded.admin.role !== "admin") {
       return res.status(403).json({ msg: "Access denied, not an admin" });
     }
-    req.user = decoded.user;
+    req.user = decoded.admin;
     next();
   } catch (err) {
     res.status(401).json({ msg: "Token is not valid" });
@@ -35,7 +33,7 @@ exports.studentAuth = function (req, res, next) {
     const decoded = jwt.verify(token, "payment");
     console.log("Decoded Payload:", decoded); // Log the decoded payload
 
-    if (decoded.user.role !== "student") {
+    if (!decoded.user || decoded.user.role !== "student") {
       return res.status(403).json({ msg: "Access denied, not a student" });
     }
     req.user = decoded.user;

@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
-
 const PaymentSchema = new mongoose.Schema({
-  admissionNo: {
+  studentpaymentid: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Student",
     required: true,
@@ -10,24 +9,18 @@ const PaymentSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  date: {
-    type: Date,
-    default: Date.now,
-  },
   status: {
     type: String,
-    enum: ["pending", "paid", "failed"],
+    enum: ["pending", "success", "failed"],
     default: "pending",
-  },
-  method: {
-    type: String,
-    enum: ["credit_card", "debit_card", "upi", "net_banking"],
-    required: true,
   },
   paymentIntentId: {
     type: String,
     required: true,
   },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
 });
-
 module.exports = mongoose.model("Payment", PaymentSchema);

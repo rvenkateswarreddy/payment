@@ -1,7 +1,10 @@
+const mongoose = require("mongoose");
 const Student = require("../models/Student");
 const Payment = require("../models/Payment");
 const Razorpay = require("razorpay");
 const { validationResult } = require("express-validator");
+const Fee = require("../models/Fee");
+const Category = require("../models/Category");
 
 // Initialize Razorpay instance
 const razorpay = new Razorpay({
@@ -12,34 +15,6 @@ const razorpay = new Razorpay({
 // @route   GET api/students/dashboard
 // @desc    Retrieve student dashboard data (profile, payment details, history)
 // @access  Private (Student)
-exports.getStudentDashboard = async (req, res) => {
-  try {
-    const student = await Student.findById(req.user.id).select("-password");
-    const payments = await Payment.find({ admissionNo: req.student.id });
-
-    const totalAmount = payments.reduce(
-      (acc, payment) => acc + payment.amount,
-      0
-    );
-    const paidAmount = payments
-      .filter((payment) => payment.status === "paid")
-      .reduce((acc, payment) => acc + payment.amount, 0);
-    const pendingAmount = totalAmount - paidAmount;
-
-    res.json({
-      profile: student,
-      payments: {
-        totalAmount,
-        paidAmount,
-        pendingAmount,
-        history: payments,
-      },
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
-  }
-};
 
 // @route   GET api/students/profile
 // @desc    Get student profile information
@@ -90,98 +65,192 @@ exports.updateStudentProfile = async (req, res) => {
   }
 };
 
-// @route   GET api/students/payments
-// @desc    Get payment details (total amount, paid amount, pending amount)
-// @access  Private (Student)
 exports.getPaymentDetails = async (req, res) => {
+  const { paymentId } = req.params;
+
   try {
-    const payments = await Payment.find({ admissionNo: req.user.id });
-
-    const totalAmount = payments.reduce(
-      (acc, payment) => acc + payment.amount,
-      0
+    const payment = await Payment.findById(paymentId).populate(
+      "studentpaymentid",
+      "name email"
     );
-    const paidAmount = payments
-      .filter((payment) => payment.status === "paid")
-      .reduce((acc, payment) => acc + payment.amount, 0);
-    const pendingAmount = totalAmount - paidAmount;
 
-    res.json({
-      totalAmount,
-      paidAmount,
-      pendingAmount,
-    });
-  } catch (err) {
-    console.error(err.message);
+    if (!payment) {
+      return res.status(404).json({ msg: "Payment not found" });
+    }
+
+    res.json(payment);
+  } catch (error) {
+    console.error("Error in getPaymentDetails:", error.message);
     res.status(500).send("Server Error");
   }
 };
 
-// @route   GET api/students/payments/history
-// @desc    Get payment history
-// @access  Private (Student)
+// Get payment history for a student
 exports.getPaymentHistory = async (req, res) => {
+  const { studentId } = req.params;
+
   try {
-    const payments = await Payment.find({ admissionNo: req.user.id });
+    const payments = await Payment.find({ studentpaymentid: studentId }).sort({
+      date: -1,
+    });
+    console.log(payments);
+    if (!payments) {
+      return res
+        .status(404)
+        .json({ msg: "No payment history found for this student" });
+    }
+
     res.json(payments);
-  } catch (err) {
-    console.error(err.message);
+  } catch (error) {
+    console.error("Error in getPaymentHistory:", error.message);
+    res.status(500).send("Server Error");
+  }
+};
+
+// Get payment reports
+exports.getPaymentReports = async (req, res) => {
+  try {
+    const payments = await Payment.find()
+      .populate("studentpaymentid", "name email")
+      .sort({ date: -1 });
+
+    if (!payments) {
+      return res.status(404).json({ msg: "No payment reports found" });
+    }
+
+    res.json(payments);
+  } catch (error) {
+    console.error("Error in getPaymentReports:", error.message);
     res.status(500).send("Server Error");
   }
 };
 
 exports.makePayment = async (req, res) => {
-  const { amount, paymentMethod } = req.body;
+  const { amount } = req.body;
+
+  const options = {
+    amount: amount * 100, // Convert to smallest currency unit
+    currency: "INR",
+    receipt: `payment_${Date.now()}`,
+    // Auto-capture payment
+  };
 
   try {
-    // Validate input
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+    const order = await razorpay.orders.create(options);
+    res.json(order);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+};
+
+exports.getFees = async (req, res) => {
+  try {
+    const fees = await Fee.find({ studentfeeId: req.params.studentId });
+    if (!fees) {
+      return res.status(404).json({ msg: "Fees not found" });
+    }
+    res.json(fees);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+};
+
+const nodemailer = require("nodemailer");
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "rvenkateswarreddy12345@gmail.com", // Your email address
+    pass: "ixre adqd kylo ojiz", // Your email password or app-specific password
+  },
+});
+
+exports.verifyPayment = async (req, res) => {
+  const {
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+    studentId,
+    amount,
+    categoryId,
+  } = req.body;
+
+  try {
+    // Validate studentId (assuming it's a valid MongoDB ObjectId)
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({ msg: "Invalid student ID format" });
     }
 
-    if (!amount || !paymentMethod) {
-      return res
-        .status(400)
-        .json({ msg: "Amount and payment method are required" });
+    const studentObjectId = new mongoose.Types.ObjectId(studentId);
+
+    // Fetch the category details based on categoryId
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      return res.status(404).json({ msg: "Category not found" });
     }
 
-    // Create Razorpay order
-    const options = {
-      amount: amount * 100, // Convert to smallest currency unit
-      currency: "INR",
-      receipt: `payment_${Date.now()}`,
-      payment_capture: 1, // Auto-capture payment
-    };
-
-    // Add payment method specifics
-    if (paymentMethod) {
-      options["method"] = paymentMethod;
-    }
-
-    const response = await razorpay.orders.create(options);
-
-    // Save payment details to database
+    // Save payment details
     const payment = new Payment({
-      admissionNo: req.user.id,
+      studentpaymentid: studentObjectId,
       amount,
-      status: "pending",
-      method: paymentMethod || "Razorpay", // Default to Razorpay if no specific method
-      paymentIntentId: response.id,
+      status: "success",
+      paymentIntentId: razorpay_payment_id,
       date: Date.now(),
     });
 
     await payment.save();
 
-    res.json({
-      orderId: response.id,
-      amount: response.amount / 100, // Convert back to actual currency
-      currency: response.currency,
-      receipt: response.receipt,
-      clientSecret: "", // No client secret needed for Razorpay
+    // Update fee details
+    let fee = await Fee.findOne({ studentfeeId: studentObjectId, categoryId });
+    if (fee) {
+      // Update existing fee entry
+      fee.paidFees = parseFloat(fee.paidFees) + parseFloat(amount);
+      fee.pendingFees = parseFloat(fee.pendingFees) - parseFloat(amount);
+    } else {
+      // New fee entry for the category
+      const totalFees = category.amount;
+      fee = new Fee({
+        studentfeeId: studentObjectId,
+        categoryName: category.name,
+        categoryId,
+        totalFees,
+        paidFees: amount,
+        pendingFees: totalFees - amount,
+      });
+    }
+
+    await fee.save();
+
+    // Send email notification
+    const student = await Student.findById(studentId).select("name email");
+    const mailOptions = {
+      from: "your-email@gmail.com",
+      to: student.email,
+      subject: "Payment Successful Notification",
+      html: `
+        <p>Hello ${student.name},</p>
+        <p>Your payment of ${amount} INR for ${category.name} category has been successfully received.</p>
+        <p>Total Fees: ${category.amount} INR</p>
+        <p>Paid Amount: ${fee.paidFees} INR</p>
+        <p>Pending Amount: ${fee.pendingFees} INR</p>
+        <p>Thank you for your payment.</p>
+        <p>Sincerely,</p>
+        <p>SV University</p>
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Error sending email:", error);
+      } else {
+        console.log("Email sent:", info.response);
+      }
     });
-  } catch (err) {
-    console.error("Error in makePayment:", err.message); // Log the error message
+
+    // Respond with success message
+    res.json({ status: "Payment successful" });
+  } catch (error) {
+    console.error("Error in verifyPayment:", error.message);
     res.status(500).send("Server Error");
   }
 };

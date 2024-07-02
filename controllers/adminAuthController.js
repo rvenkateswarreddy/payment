@@ -36,6 +36,7 @@ exports.adminSignup = async (req, res) => {
     const payload = {
       admin: {
         id: admin.id,
+        role: "admin",
       },
     };
 
@@ -69,6 +70,7 @@ exports.adminLogin = async (req, res) => {
     const payload = {
       admin: {
         id: admin.id,
+        role: "admin",
       },
     };
 
